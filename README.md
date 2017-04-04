@@ -4,7 +4,7 @@ Thru git commits
 
 Use key `up` and `down` to quick thru git commits easily.
 
-![](https://raw.githubusercontent.com/hellocreep/git-thru/master/git-thru-screensho.jpeg)
+![](https://raw.githubusercontent.com/hellocreep/git-thru/master/git-thru-screenshot.jpeg)
 
 ## Install
 
