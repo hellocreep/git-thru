@@ -2,10 +2,10 @@
   "name": "git-thru",
   "version": "1.0.2",
   "description": "Thru git commits",
-  "main": "index.js",
-  "bin": "cli.js",
+  "main": "dist/index.js",
+  "bin": "dist/cli.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "babel lib --out-dir dist"
   },
   "keywords": [
     "git",
@@ -17,6 +17,8 @@
   "license": "MIT",
   "devDependencies": {
     "ava": "^0.18.2",
+    "babel-cli": "^6.24.1",
+    "babel-plugin-transform-async-to-generator": "^6.24.1",
     "xo": "^0.18.1"
   },
   "xo": {
