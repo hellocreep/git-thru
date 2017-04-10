@@ -31,16 +31,16 @@ gitThru().then(git => {
 
   stdin.on('data', command => {
     // Up
-    if (command === '\u001b[A') {
+    if (command === '\u001b[A' || command === '\u006A') {
       git.prevCommit();
     }
 
     // Down
-    if (command === '\u001b[B') {
+    if (command === '\u001b[B' || command === '\u006B') {
       git.nextCommit();
     }
 
-    // Quite
+    // Quit
     if (command === '\u0003') {
       exec('git checkout master', () => {
         logUpdate.clear();
