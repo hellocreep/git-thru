@@ -27,8 +27,8 @@ gitThru().then(git => {
   // get current git logs
   git.getLogs()
 
-  // get current commit cursor
-  git.getCursor()
+  // get current git position 
+  git.getPosition()
 
   // checkout to next commit
   git.nextCommit()

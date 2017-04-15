@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 
-const exec = require('child_process').exec;
 const chalk = require('chalk');
 const logUpdate = require('log-update');
 const cliCursor = require('cli-cursor');
@@ -14,38 +13,41 @@ const stdin = process.stdin;
 stdin.setRawMode(true);
 stdin.setEncoding('utf8');
 
+const keyUp = '\u001b[A';
+const keyDown = '\u001b[B';
+const keyJ = '\u006A';
+const keyK = '\u006B';
+const keyCtrlC = '\u0003';
+
 function formatLogs(logs, cursor) {
   return logs.map((log, index) => {
-    if (cursor === index) {
-      return `${logSymbols.success} ${chalk.bgBlue(log.commit, log.subject, log.author)}`;
+    const currentCommit = cursor === index;
+    const commitMessage = `${chalk.red(log.commit)} ${chalk.green(log.subject)} <${log.author}>`;
+    if (currentCommit) {
+      return `${logSymbols.success} ${commitMessage}`;
     }
 
-    return `${chalk.red(log.commit)} ${chalk.green(log.subject)} ${log.author}`;
+    return commitMessage;
   });
 }
 
 gitThru().then(git => {
   setInterval(() => {
-    logUpdate(formatLogs(git.getLogs(), git.getCursor()).join('\n'));
+    logUpdate(formatLogs(git.getLogs(), git.getPosition().cursor).join('\n'));
   }, 100);
 
   stdin.on('data', command => {
-    // Up
-    if (command === '\u001b[A' || command === '\u006A') {
+    if (command === keyUp || command === keyJ) {
       git.prevCommit();
     }
 
-    // Down
-    if (command === '\u001b[B' || command === '\u006B') {
+    if (command === keyDown || command === keyK) {
       git.nextCommit();
     }
 
-    // Quit
-    if (command === '\u0003') {
-      exec('git checkout master', () => {
-        logUpdate.clear();
-        process.exit();
-      });
+    if (command === keyCtrlC) {
+      logUpdate.clear();
+      process.exit();
     }
   });
 });

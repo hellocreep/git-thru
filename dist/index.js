@@ -1,21 +1,24 @@
 let gitThru = (() => {
   var _ref = _asyncToGenerator(function* () {
-    commitCount = yield getCommitCount();
-    gitLogs = yield getLogs();
+    const commitCount = yield git._getCommitCount();
+    git.setCommitCount(commitCount);
+
+    const logs = yield git._getLogs();
+    git.setLogs(logs);
 
     return {
       getLogs: function () {
-        return gitLogs;
+        return git.logs;
       },
-      getCursor: function () {
-        return gitCursor;
+      getPosition: function () {
+        return git.position;
       },
       prevCommit: function () {
-        return prevCommit(gitLogs, gitCursor).then(function ({ updatedLogs, position, done }) {
+        return _prevCommit(git.logs, git.position.cursor).then(function ({ updatedLogs, position, done }) {
           if (done) {
             return done;
           }
-          updateGitCursor(position.cursor);
+          git.setPosition(position);
           return {
             logs: updatedLogs,
             position
@@ -23,12 +26,12 @@ let gitThru = (() => {
         });
       },
       nextCommit: function () {
-        return nextCommit(gitLogs, gitCursor).then(function ({ updatedLogs, position, done }) {
+        return _nextCommit(git.logs, git.position.cursor).then(function ({ updatedLogs, position, done }) {
           if (done) {
             return done;
           }
-          updateGitCursor(position.cursor);
-          updateGitLogs(updatedLogs);
+          git.setPosition(position);
+          git.setLogs(updatedLogs);
           return {
             logs: updatedLogs,
             position
@@ -56,77 +59,84 @@ const gitCommands = {
   revList: 'git rev-list --all --count'
 };
 
-let gitLogs = [];
-let gitCursor = 0;
-let commitCount = 0;
+class Git {
+  constructor() {
+    this.logs = [];
+    this.commitCount = 0;
+    this.position = {
+      cursor: 0,
+      commidId: ''
+    };
+  }
 
-function updateGitCursor(cursor) {
-  gitCursor = cursor;
-}
+  setPosition(position) {
+    this.position.cursor = position.cursor;
+    this.position.commidId = position.commitId;
+  }
 
-function updateGitLogs(logs) {
-  gitLogs = logs;
-}
+  setLogs(logs) {
+    this.logs = logs;
+  }
 
-function updateCommitCount(count) {
-  commitCount = count;
-}
+  setCommitCount(commitCount) {
+    this.commitCount = commitCount;
+  }
 
-function getCommitCount() {
-  return new Promise((resolve, reject) => {
-    exec(gitCommands.revList, (err, stdout, stderr) => {
-      if (err) {
-        console.log('err', err);
-        return reject(err);
-      }
-
-      if (stderr) {
-        console.log('stderr', stderr);
-        return reject(err);
-      }
-
-      if (stdout) {
-        commitCount = parseInt(stdout, 10);
-        updateCommitCount(commitCount);
-        resolve(commitCount);
-      }
-    });
-  });
-}
-
-function getLogs() {
-  return new Promise((resolve, reject) => {
-    exec(gitCommands.log, (err, stdout, stderr) => {
-      if (err) {
-        console.log('err', err);
-        return reject(err);
-      }
-
-      if (stderr) {
-        console.log('stderr', stderr);
-        return reject(err);
-      }
-
-      if (stdout) {
-        const logList = JSON.parse(`[${stdout.slice(0, -1)}]`);
-        if (gitLogs.length === commitCount) {
-          return resolve(gitLogs);
+  _getCommitCount() {
+    return new Promise((resolve, reject) => {
+      exec(gitCommands.revList, (err, stdout, stderr) => {
+        if (err) {
+          console.log('err', err);
+          return reject(err);
         }
-        if (gitLogs.length === 0) {
-          gitLogs = logList;
-        } else {
-          const lastVisibleCommit = _.last(logList);
-          if (lastVisibleCommit.commit !== _.last(gitLogs).commit) {
-            gitLogs = gitLogs.concat(lastVisibleCommit);
+
+        if (stderr) {
+          console.log('stderr', stderr);
+          return reject(err);
+        }
+
+        if (stdout) {
+          const commitCount = parseInt(stdout, 10);
+          resolve(commitCount);
+        }
+      });
+    });
+  }
+
+  _getLogs() {
+    return new Promise((resolve, reject) => {
+      exec(gitCommands.log, (err, stdout, stderr) => {
+        if (err) {
+          console.log('err', err);
+          return reject(err);
+        }
+
+        if (stderr) {
+          console.log('stderr', stderr);
+          return reject(err);
+        }
+
+        if (stdout) {
+          const logList = JSON.parse(`[${stdout.slice(0, -1)}]`);
+
+          const gotAllLogs = this.logs.length === this.commitCount;
+          if (gotAllLogs) {
+            return resolve(this.logs);
+          }
+
+          const hasNewCommit = _.get(_.last(logList), 'commit') !== _.get(_.last(this.logs), 'commit', '');
+          if (hasNewCommit) {
+            return _.first(this.logs) ? resolve(_.chain(this.logs).concat(_.last(logList)).value()) : resolve(logList);
           }
         }
-        return resolve(gitLogs);
-      }
+      });
     });
-  });
+  }
 }
 
-function nextCommit(logs, cursor) {
+const git = new Git();
+
+function _nextCommit(logs, cursor) {
   const nextCommitLog = logs[cursor + 1];
 
   if (_.isUndefined(nextCommitLog)) {
@@ -142,12 +152,12 @@ function nextCommit(logs, cursor) {
       }
 
       if (stderr) {
-        return getLogs().then(updatedLogs => {
+        return git._getLogs().then(updatedLogs => {
           return resolve({
             updatedLogs,
             position: {
               cursor: ++cursor,
-              commidId: nextCommitId
+              commitId: nextCommitId
             }
           });
         });
@@ -156,7 +166,7 @@ function nextCommit(logs, cursor) {
   });
 }
 
-function prevCommit(logs, cursor) {
+function _prevCommit(logs, cursor) {
   const preveCommitLog = logs[cursor - 1];
   if (_.isUndefined(preveCommitLog)) {
     return Promise.resolve({ done: true });
@@ -174,16 +184,12 @@ function prevCommit(logs, cursor) {
           updatedLogs: logs,
           position: {
             cursor: --cursor,
-            commidId: preveCommitId
+            commitId: preveCommitId
           }
         });
       }
     });
   });
 }
-
-exports.getLogs = getLogs;
-exports.nextCommit = nextCommit;
-exports.prevCommit = prevCommit;
 
 module.exports = gitThru;
